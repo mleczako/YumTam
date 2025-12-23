@@ -3,52 +3,71 @@ import { Keyboard, StyleSheet, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import DiscoverHeader from '../components/DiscoverHeader';
+import FilterModal from '../components/FilterModal';
 import RestaurantCard from '../components/RestaurantCard';
 import { restaurants } from '../data/restaurants';
 
 const CENTER_LAT = 51.1100;
 const CENTER_LNG = 17.0325;
-const MAX_DELTA = 0.04;
+const MAX_DELTA = 0.02; 
 
-export default function DiscoverScreen() {
+const HIDE_POI_STYLE = [
+  { "featureType": "poi.business", "stylers": [{ "visibility": "off" }] },
+  { "featureType": "poi.medical", "stylers": [{ "visibility": "off" }] },
+  { "featureType": "poi.school", "stylers": [{ "visibility": "off" }] }
+];
+
+export default function DiscoverScreen({ navigation }) {
   const [searchText, setSearchText] = useState('');
-  const [activeCategory, setActiveCategory] = useState('Wszystkie');
+  
+  const [selectedCategories, setSelectedCategories] = useState([]); 
   const [isCheapBeer, setIsCheapBeer] = useState(false);
+  const [hasLunch, setHasLunch] = useState(false);
+  
+  const [modalVisible, setModalVisible] = useState(false); 
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   
   const mapRef = useRef(null);
 
+  const resetFilters = () => {
+    setSelectedCategories([]);
+    setIsCheapBeer(false);
+    setHasLunch(false);
+  };
+
   const displayedRestaurants = restaurants.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchText.toLowerCase());
-    const matchesCategory = activeCategory === 'Wszystkie' || item.cuisine.includes(activeCategory);
+    const matchesCategory = selectedCategories.length === 0 || selectedCategories.some(cat => item.cuisine.includes(cat));
     const matchesBeer = !isCheapBeer || item.beerPrice <= 10;
-    return matchesSearch && matchesCategory && matchesBeer;
+    const matchesLunch = !hasLunch || item.hasLunch;
+    return matchesSearch && matchesCategory && matchesBeer && matchesLunch;
   });
+
+  const activeFiltersCount = selectedCategories.length + (isCheapBeer ? 1 : 0) + (hasLunch ? 1 : 0);
 
   useEffect(() => {
     if (selectedRestaurant) {
       const isVisible = displayedRestaurants.find(r => r.id === selectedRestaurant.id);
-      
-      if (!isVisible) {
-        setSelectedRestaurant(null);
-      }
+      if (!isVisible) setSelectedRestaurant(null);
     }
-  }, [displayedRestaurants]); 
+  }, [displayedRestaurants]);
 
-  const handleRegionChange = (region) => {
+
+  const handleRegionChangeComplete = (region) => {
     const latDiff = Math.abs(region.latitude - CENTER_LAT);
     const lngDiff = Math.abs(region.longitude - CENTER_LNG);
-    if (latDiff > MAX_DELTA || lngDiff > MAX_DELTA) {
-      if (mapRef.current) {
-        mapRef.current.animateToRegion({
-          latitude: CENTER_LAT,
-          longitude: CENTER_LNG,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
-        }, 500);
-      }
+
+    if (latDiff > MAX_DELTA * 1.5 || lngDiff > MAX_DELTA * 1.5) {
+      mapRef.current?.animateToRegion({
+        latitude: CENTER_LAT,
+        longitude: CENTER_LNG,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      }, 500); 
     }
   };
+
+  const markersKey = `${isCheapBeer}-${hasLunch}-${selectedCategories.join(',')}-${searchText}`;
 
   return (
     <View style={styles.container}>
@@ -56,30 +75,24 @@ export default function DiscoverScreen() {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
-        onPress={() => {
-          setSelectedRestaurant(null);
-          Keyboard.dismiss(); 
-        }} 
-        onRegionChangeComplete={handleRegionChange} 
+        customMapStyle={HIDE_POI_STYLE} 
+        showsPointsOfInterest={false}
+        
+        onRegionChangeComplete={handleRegionChangeComplete} 
+        
+        onPress={() => { setSelectedRestaurant(null); Keyboard.dismiss(); }} 
         initialRegion={{
-          latitude: CENTER_LAT,
-          longitude: CENTER_LNG,
-          latitudeDelta: 0.02, 
-          longitudeDelta: 0.02,
+          latitude: CENTER_LAT, longitude: CENTER_LNG,
+          latitudeDelta: 0.02, longitudeDelta: 0.02,
         }}
-        minZoomLevel={13} 
-        maxZoomLevel={20}
-        moveOnMarkerPress={false} 
+        minZoomLevel={13} maxZoomLevel={20} moveOnMarkerPress={false} 
       >
         {displayedRestaurants.map((marker) => (
           <Marker
-            key={`${marker.id}-${isCheapBeer}-${activeCategory}-${searchText}`} 
+            key={`${marker.id}-${markersKey}`} 
             coordinate={marker.coordinates}
-            onPress={(e) => {
-              e.stopPropagation();
-              setSelectedRestaurant(marker);
-            }}
-            pinColor={marker.beerPrice <= 10 ? "green" : "red"}
+            onPress={(e) => { e.stopPropagation(); setSelectedRestaurant(marker); }}
+            pinColor={marker.beerPrice <= 10 ? "green" : (marker.hasLunch ? "azure" : "red")}
           />
         ))}
       </MapView>
@@ -87,17 +100,30 @@ export default function DiscoverScreen() {
       <DiscoverHeader 
         searchText={searchText}
         setSearchText={setSearchText}
-        activeCategory={activeCategory}
-        setActiveCategory={setActiveCategory}
+        onOpenFilters={() => setModalVisible(true)}
+        activeFiltersCount={activeFiltersCount}
+      />
+
+      <FilterModal 
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        selectedCategories={selectedCategories}
+        setSelectedCategories={setSelectedCategories}
         isCheapBeer={isCheapBeer}
         setIsCheapBeer={setIsCheapBeer}
+        hasLunch={hasLunch}
+        setHasLunch={setHasLunch}
+        onReset={resetFilters} 
       />
 
       <RestaurantCard 
         restaurant={selectedRestaurant}
         onClose={() => setSelectedRestaurant(null)}
+        onDetails={() => {
+          setSelectedRestaurant(null); 
+          navigation.navigate('RestaurantDetails', { restaurant: selectedRestaurant });
+        }}
       />
-
     </View>
   );
 }

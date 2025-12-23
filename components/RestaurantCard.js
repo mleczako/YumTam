@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export default function RestaurantCard({ restaurant, onClose }) {
+export default function RestaurantCard({ restaurant, onClose, onDetails }) {
   if (!restaurant) return null;
 
   return (
@@ -15,13 +15,15 @@ export default function RestaurantCard({ restaurant, onClose }) {
           </View>
         </View>
         <Text style={styles.cardCuisine}>{restaurant.cuisine}</Text>
-        <Text style={styles.cardDescription} numberOfLines={2}>
+        <Text style={styles.cardDescription} numberOfLines={1}>
           {restaurant.description}
         </Text>
         <View style={styles.cardFooter}>
           <Text style={styles.cardPrice}>Piwo: {restaurant.beerPrice} zł</Text>
-          <TouchableOpacity style={styles.moreButton}>
-            <Text style={styles.moreButtonText}>Menu ➔</Text>
+          
+          <TouchableOpacity style={styles.moreButton} onPress={onDetails}>
+            <Text style={styles.moreButtonText}>Szczegóły</Text>
+            <Ionicons name="arrow-forward" size={14} color="#333" style={{marginLeft: 4}} />
           </TouchableOpacity>
         </View>
       </View>
@@ -50,7 +52,16 @@ const styles = StyleSheet.create({
   cardDescription: { fontSize: 11, color: '#555', lineHeight: 14 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   cardPrice: { fontWeight: 'bold', fontSize: 12, color: '#333' },
-  moreButton: { backgroundColor: '#f0f0f0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-  moreButtonText: { fontSize: 10, fontWeight: '600', color: '#333' },
+  
+  moreButton: { 
+    backgroundColor: '#f0f0f0', 
+    paddingHorizontal: 12, 
+    paddingVertical: 6, 
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  moreButtonText: { fontSize: 11, fontWeight: '600', color: '#333' },
+  
   closeButton: { position: 'absolute', top: -8, right: -8, backgroundColor: 'white', borderRadius: 15, padding: 0 }
 });
