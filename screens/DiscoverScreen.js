@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { Keyboard, StyleSheet, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import DiscoverHeader from '../components/DiscoverHeader';
 import FilterModal from '../components/FilterModal';
 import RestaurantCard from '../components/RestaurantCard';
+import { VisitsContext } from '../context/VisitsContext';
 import { restaurants } from '../data/restaurants';
 
 const CENTER_LAT = 51.1100;
@@ -20,6 +21,9 @@ const HIDE_POI_STYLE = [
 export default function DiscoverScreen({ navigation }) {
   const [searchText, setSearchText] = useState('');
   
+  const { visits } = useContext(VisitsContext);
+  const visitedRestaurantIds = visits.map(v => v.restaurantId).filter(id => id !== null);
+
   const [selectedCategories, setSelectedCategories] = useState([]); 
   const [isCheapBeer, setIsCheapBeer] = useState(false);
   const [hasLunch, setHasLunch] = useState(false);
@@ -35,11 +39,24 @@ export default function DiscoverScreen({ navigation }) {
     setHasLunch(false);
   };
 
+  const getBeerPrice = (restaurant) => {
+    if (!restaurant.menu) return 999;
+    const beerItem = restaurant.menu.find(m => {
+        const name = m.name.toLowerCase();
+        return name.includes('piwo') || name.includes('cerveza') || name.includes('lager');
+    });
+    return beerItem ? beerItem.price : 999;
+  };
+
   const displayedRestaurants = restaurants.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchText.toLowerCase());
     const matchesCategory = selectedCategories.length === 0 || selectedCategories.some(cat => item.cuisine.includes(cat));
-    const matchesBeer = !isCheapBeer || item.beerPrice <= 10;
+    
+    const currentBeerPrice = getBeerPrice(item);
+    const matchesBeer = !isCheapBeer || currentBeerPrice <= 10;
+    
     const matchesLunch = !hasLunch || item.hasLunch;
+    
     return matchesSearch && matchesCategory && matchesBeer && matchesLunch;
   });
 
@@ -51,7 +68,6 @@ export default function DiscoverScreen({ navigation }) {
       if (!isVisible) setSelectedRestaurant(null);
     }
   }, [displayedRestaurants]);
-
 
   const handleRegionChangeComplete = (region) => {
     const latDiff = Math.abs(region.latitude - CENTER_LAT);
@@ -87,14 +103,21 @@ export default function DiscoverScreen({ navigation }) {
         }}
         minZoomLevel={13} maxZoomLevel={20} moveOnMarkerPress={false} 
       >
-        {displayedRestaurants.map((marker) => (
-          <Marker
-            key={`${marker.id}-${markersKey}`} 
-            coordinate={marker.coordinates}
-            onPress={(e) => { e.stopPropagation(); setSelectedRestaurant(marker); }}
-            pinColor={marker.beerPrice <= 10 ? "green" : (marker.hasLunch ? "azure" : "red")}
-          />
-        ))}
+        {displayedRestaurants.map((marker) => {
+          
+          const isVisited = visitedRestaurantIds.includes(marker.id);
+          
+          const pinColor = isVisited ? "#4CAF50" : "#FF5722";
+
+          return (
+            <Marker
+              key={`${marker.id}-${markersKey}`} 
+              coordinate={marker.coordinates}
+              onPress={(e) => { e.stopPropagation(); setSelectedRestaurant(marker); }}
+              pinColor={pinColor}
+            />
+          );
+        })}
       </MapView>
 
       <DiscoverHeader 

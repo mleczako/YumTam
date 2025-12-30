@@ -1,36 +1,40 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput, TouchableOpacity,
-    View
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput, TouchableOpacity,
+  View
 } from 'react-native';
 
+import { VisitsContext } from '../context/VisitsContext';
 import { restaurants } from '../data/restaurants';
 
 export default function AddVisitScreen({ navigation, route }) {
+  const { addVisit } = useContext(VisitsContext); 
+
   const [note, setNote] = useState('');
   const [imageUri, setImageUri] = useState(null);
   const [guests, setGuests] = useState('');
+  const [rating, setRating] = useState(0); 
   
   const [restaurantName, setRestaurantName] = useState('');
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState(null);
+
   const [isNameLocked, setIsNameLocked] = useState(false);
   const [modalVisible, setModalVisible] = useState(false); 
-  const [isManualInput, setIsManualInput] = useState(false); 
-
+  
   useEffect(() => {
     if (route.params?.restaurant) {
       setRestaurantName(route.params.restaurant.name);
-      setIsNameLocked(true);
-      setIsManualInput(true); 
+      setSelectedRestaurantId(route.params.restaurant.id);
+      setIsNameLocked(true); 
     }
   }, [route.params]);
 
@@ -43,32 +47,26 @@ export default function AddVisitScreen({ navigation, route }) {
   };
 
   const handleSave = async () => {
-    if (!restaurantName) {
-        Alert.alert("Braki", "Musisz wybrać lub wpisać nazwę miejsca!");
+    if (!selectedRestaurantId) {
+        Alert.alert("Wybierz lokal", "Musisz wybrać restaurację z listy, aby dodać wizytę!");
         return;
     }
 
     const newVisit = {
       id: Date.now().toString(),
+      restaurantId: selectedRestaurantId,
       restaurantName: restaurantName,
       note: note,
       imageUri: imageUri,
       guests: guests,
+      rating: rating, 
       date: new Date().toLocaleDateString(),
     };
 
-    try {
-      const existingData = await AsyncStorage.getItem('journal_visits');
-      const visits = existingData ? JSON.parse(existingData) : [];
-      visits.unshift(newVisit);
-      await AsyncStorage.setItem('journal_visits', JSON.stringify(visits));
+    await addVisit(newVisit);
 
-      Alert.alert("Sukces", "Wizyta zapisana!");
-      navigation.goBack();
-    } catch (error) {
-      console.log(error);
-      Alert.alert("Błąd", "Nie udało się zapisać danych.");
-    }
+    Alert.alert("Sukces", "Wizyta zapisana!");
+    navigation.goBack();
   };
 
   const renderRestaurantOption = ({ item }) => (
@@ -76,8 +74,8 @@ export default function AddVisitScreen({ navigation, route }) {
       style={styles.modalItem} 
       onPress={() => {
         setRestaurantName(item.name);
+        setSelectedRestaurantId(item.id);
         setModalVisible(false);
-        setIsManualInput(true); 
       }}
     >
       <Text style={styles.modalItemText}>{item.name}</Text>
@@ -90,22 +88,12 @@ export default function AddVisitScreen({ navigation, route }) {
       
       <Text style={styles.label}>Miejsce:</Text>
       
-      {isManualInput ? (
-        <View style={{marginBottom: 20}}>
-          <TextInput
-            style={[styles.input, styles.nameInput, isNameLocked && styles.disabledInput, {marginBottom: 5}]}
-            placeholder="Gdzie byłeś?"
-            value={restaurantName}
-            onChangeText={setRestaurantName}
-            editable={!isNameLocked} 
-          />
-          {!isNameLocked && (
-            <TouchableOpacity onPress={() => { setIsManualInput(false); setRestaurantName(''); }}>
-              <Text style={{color: '#FF4500', fontSize: 12, textAlign: 'right'}}>
-                Powrót do listy
-              </Text>
-            </TouchableOpacity>
-          )}
+      {isNameLocked ? (
+        <View style={[styles.selectButton, {backgroundColor: '#f0f0f0'}]}>
+           <Text style={[styles.selectButtonText, {color: '#555', fontWeight: 'bold'}]}>
+            {restaurantName}
+           </Text>
+           <Ionicons name="lock-closed" size={16} color="#999" />
         </View>
       ) : (
         <TouchableOpacity 
@@ -138,23 +126,25 @@ export default function AddVisitScreen({ navigation, route }) {
               data={restaurants}
               keyExtractor={item => item.id}
               renderItem={renderRestaurantOption}
-              style={{maxHeight: 300}}
+              style={{maxHeight: 400}}
             />
-
-            <TouchableOpacity 
-              style={styles.manualOption}
-              onPress={() => {
-                setModalVisible(false);
-                setIsManualInput(true);
-                setRestaurantName('');
-              }}
-            >
-              <Ionicons name="pencil" size={18} color="#FF4500" style={{marginRight: 10}} />
-              <Text style={styles.manualOptionText}>Inne miejsce (wpisz ręcznie)</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      <Text style={styles.label}>Twoja ocena:</Text>
+      <View style={styles.ratingContainer}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <TouchableOpacity key={star} onPress={() => setRating(star)}>
+            <Ionicons 
+              name={star <= rating ? "star" : "star-outline"} 
+              size={36} 
+              color="#FFD700" 
+              style={{marginHorizontal: 5}}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <Text style={styles.label}>Z kim byłeś? (Opcjonalne)</Text>
       <View style={styles.guestsInputContainer}>
@@ -197,14 +187,12 @@ export default function AddVisitScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  label: { fontSize: 16, fontWeight: '600', marginBottom: 5, color: '#333' },
+  label: { fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#333' },
   
   input: { 
     backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#eee', 
     borderRadius: 12, padding: 15, fontSize: 16, marginBottom: 20 
   },
-  nameInput: { fontWeight: 'bold', color: '#333' },
-  disabledInput: { backgroundColor: '#eee', color: '#555' },
   
   selectButton: {
     backgroundColor: '#fff', borderWidth: 1, borderColor: '#ccc',
@@ -213,13 +201,18 @@ const styles = StyleSheet.create({
   },
   selectButtonText: { fontSize: 16, color: '#333' },
 
+  ratingContainer: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+
   modalOverlay: { 
     flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', 
     justifyContent: 'flex-end' 
   },
   modalContent: { 
     backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, 
-    padding: 20, maxHeight: '60%' 
+    padding: 20, maxHeight: '70%' 
   },
   modalHeader: { 
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
@@ -231,11 +224,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between' 
   },
   modalItemText: { fontSize: 16 },
-  manualOption: { 
-    marginTop: 15, paddingVertical: 15, flexDirection: 'row', 
-    alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff0e6', borderRadius: 12 
-  },
-  manualOptionText: { color: '#FF4500', fontWeight: 'bold' },
 
   guestsInputContainer: { 
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', 
@@ -246,6 +234,6 @@ const styles = StyleSheet.create({
   imagePreview: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   imagePlaceholderText: { color: '#999', marginTop: 10 },
-  saveButton: { backgroundColor: '#FF4500', paddingVertical: 15, borderRadius: 30, alignItems: 'center', elevation: 3, marginTop: 10 },
+  saveButton: { backgroundColor: '#FF4500', paddingVertical: 15, borderRadius: 30, alignItems: 'center', elevation: 3, marginTop: 10, marginBottom: 40 },
   saveButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
 });

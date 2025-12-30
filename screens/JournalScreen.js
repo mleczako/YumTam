@@ -1,131 +1,197 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useContext } from 'react';
+import { Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { VisitsContext } from '../context/VisitsContext';
 
 export default function JournalScreen({ navigation }) {
-  const [visits, setVisits] = useState([]);
+  const { visits, deleteVisit } = useContext(VisitsContext);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadVisits();
-    }, [])
-  );
+  const reversedVisits = visits ? visits.slice().reverse() : [];
 
-  const loadVisits = async () => {
-    try {
-      const data = await AsyncStorage.getItem('journal_visits');
-      if (data) {
-        setVisits(JSON.parse(data));
-      }
-    } catch (error) {
-      console.log("Błąd ładowania", error);
-    }
+  const handleDelete = (id) => {
+    Alert.alert(
+      "Usuń wpis",
+      "Czy na pewno chcesz usunąć to wspomnienie?",
+      [
+        { text: "Anuluj", style: "cancel" },
+        { text: "Usuń", style: "destructive", onPress: () => deleteVisit(id) }
+      ]
+    );
   };
 
-  const deleteVisit = async (id) => {
-    const newVisits = visits.filter(v => v.id !== id);
-    setVisits(newVisits);
-    await AsyncStorage.setItem('journal_visits', JSON.stringify(newVisits));
-  };
-
-  const renderVisit = ({ item }) => (
+  const renderVisitItem = ({ item }) => (
     <View style={styles.card}>
       {item.imageUri && (
-        <Image source={{ uri: item.imageUri }} style={styles.cardImage} />
+        <Image source={{ uri: item.imageUri }} style={styles.image} />
       )}
-      <View style={styles.cardContent}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.restaurantName}>{item.restaurantName}</Text>
-          <Text style={styles.date}>{item.date}</Text>
+      
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <View style={{flex: 1}}>
+            <Text style={styles.restaurantName}>{item.restaurantName}</Text>
+            <Text style={styles.date}>{item.date}</Text>
+          </View>
+          
+          <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteButton}>
+            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+          </TouchableOpacity>
         </View>
 
+        {item.rating > 0 && (
+           <View style={styles.ratingRow}>
+             {[...Array(5)].map((_, i) => (
+               <Ionicons 
+                 key={i} 
+                 name={i < item.rating ? "star" : "star-outline"} 
+                 size={14} 
+                 color="#FFD700" 
+               />
+             ))}
+           </View>
+        )}
+
         {item.guests ? (
-          <View style={styles.guestsRow}>
-            <Ionicons name="people" size={16} color="#FF4500" style={{marginRight: 5}} />
-            <Text style={styles.guestsText}>Z: {item.guests}</Text>
+          <View style={styles.row}>
+            <Ionicons name="people-outline" size={16} color="#666" />
+            <Text style={styles.guestsText}>{item.guests}</Text>
           </View>
         ) : null}
 
-        <Text style={styles.note} numberOfLines={2}>{item.note}</Text>
-        
-        <TouchableOpacity onPress={() => deleteVisit(item.id)} style={styles.trashBtn}>
-          <Ionicons name="trash-outline" size={20} color="#999" />
-        </TouchableOpacity>
+        {item.note ? (
+          <Text style={styles.note}>{item.note}</Text>
+        ) : null}
       </View>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Twój Dziennik</Text>
-      </View>
+      <Text style={styles.headerTitle}>Twój Dziennik</Text>
 
-      {visits.length === 0 ? (
-        <View style={styles.placeholderContainer}>
-          <Ionicons name="book-outline" size={80} color="#ddd" />
-          <Text style={styles.placeholderText}>Pusto tu...</Text>
-          <Text style={styles.placeholderSubText}>Dodaj pierwsze wspomnienie!</Text>
+      {reversedVisits.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="book-outline" size={64} color="#ccc" />
+          <Text style={styles.emptyText}>Twój dziennik jest pusty.</Text>
+          <Text style={styles.emptySubText}>Dodaj pierwszą wizytę!</Text>
         </View>
       ) : (
-        <FlatList 
-          data={visits}
-          keyExtractor={item => item.id}
-          renderItem={renderVisit}
-          contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        <FlatList
+          data={reversedVisits}
+          keyExtractor={(item) => item.id}
+          renderItem={renderVisitItem}
+          contentContainerStyle={{ paddingBottom: 100 }} 
         />
       )}
 
       <TouchableOpacity 
-        style={styles.fab}
+        style={styles.fab} 
         onPress={() => navigation.navigate('AddVisit')}
       >
-        <Ionicons name="add" size={30} color="white" />
+        <Ionicons name="add" size={32} color="white" />
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  header: { 
-    paddingTop: 50, paddingBottom: 15, paddingHorizontal: 20, 
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' 
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 20,
+    paddingTop: 50,
   },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#333' },
-  
-  placeholderContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  placeholderText: { fontSize: 20, fontWeight: 'bold', color: '#333', marginTop: 20 },
-  placeholderSubText: { fontSize: 16, color: '#999', marginTop: 5 },
-
-  card: { 
-    backgroundColor: '#fff', borderRadius: 15, marginBottom: 15, overflow: 'hidden',
-    elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3 
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#333',
   },
-  cardImage: { width: '100%', height: 150 },
-  cardContent: { padding: 15 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
-  restaurantName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  date: { fontSize: 12, color: '#999' },
-  note: { fontSize: 14, color: '#555', lineHeight: 20 },
-  
-  trashBtn: { position: 'absolute', bottom: 10, right: 10 },
-
-  fab: {
-    position: 'absolute', width: 60, height: 60, alignItems: 'center', justifyContent: 'center',
-    right: 20, bottom: 90, backgroundColor: '#FF4500', borderRadius: 30,
-    elevation: 5, shadowColor: '#FF4500', shadowOpacity: 0.4, shadowRadius: 5
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginBottom: 20,
+    overflow: 'hidden',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  guestsRow: {
+  image: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#eee',
+  },
+  content: {
+    padding: 15,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  restaurantName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  date: {
+    fontSize: 12,
+    color: '#999',
+  },
+  deleteButton: {
+    padding: 5,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8, 
+    marginBottom: 10,
   },
   guestsText: {
-    fontSize: 13,
-    color: '#FF4500',
-    fontWeight: '600'
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 6,
+  },
+  note: {
+    fontSize: 15,
+    color: '#444',
+    lineHeight: 22,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#555',
+    marginTop: 10,
+  },
+  emptySubText: {
+    color: '#999',
+    marginTop: 5,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 90, 
+    backgroundColor: '#FF4500',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 });

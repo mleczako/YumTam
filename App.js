@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 
+import { VisitsProvider } from './context/VisitsContext'; // <--- Importujemy Context
 import AddVisitScreen from './screens/AddVisitScreen';
 import DiscoverScreen from './screens/DiscoverScreen';
 import JournalScreen from './screens/JournalScreen';
@@ -40,37 +41,41 @@ const Stack = createNativeStackNavigator();
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <StatusBar style="dark" />
-      <Stack.Navigator>
-        <Stack.Screen 
-          name="HomeTabs" 
-          component={HomeTabs} 
-          options={{ headerShown: false }} 
-        />
-        
-        <Stack.Screen 
-          name="AddVisit" 
-          component={AddVisitScreen}
-          options={{ 
-            title: 'Dodaj wspomnienie', 
-            headerTintColor: '#FF4500',
-            headerBackTitleVisible: false, 
-            headerBackTitle: 'Wróć'       
-          }} 
-        />
+    // WAŻNE: Owijamy całą aplikację w VisitsProvider
+    // Dzięki temu każdy ekran w środku ma dostęp do bazy wizyt
+    <VisitsProvider>
+      <NavigationContainer>
+        <StatusBar style="dark" />
+        <Stack.Navigator>
+          <Stack.Screen 
+            name="HomeTabs" 
+            component={HomeTabs} 
+            options={{ headerShown: false }} 
+          />
+          
+          <Stack.Screen 
+            name="AddVisit" 
+            component={AddVisitScreen}
+            options={{ 
+              title: 'Dodaj wspomnienie', 
+              headerTintColor: '#FF4500',
+              headerBackTitleVisible: false, 
+              headerBackTitle: 'Wróć'       
+            }} 
+          />
 
-        <Stack.Screen 
-          name="RestaurantDetails" 
-          component={RestaurantDetailsScreen}
-          options={{ 
-            title: 'Szczegóły', 
-            headerTintColor: '#FF4500',
-            headerBackTitleVisible: false, 
-            headerBackTitle: 'Wróć'        
-          }} 
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+          <Stack.Screen 
+            name="RestaurantDetails" 
+            component={RestaurantDetailsScreen}
+            options={{ 
+              title: 'Szczegóły', 
+              headerTintColor: '#FF4500',
+              headerBackTitleVisible: false, 
+              headerBackTitle: 'Wróć'        
+            }} 
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </VisitsProvider>
   );
 }
