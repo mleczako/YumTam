@@ -1,5 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useContext, useEffect, useRef, useState } from 'react';
-import { Keyboard, StyleSheet, View } from 'react-native';
+import { Keyboard, StyleSheet, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import DiscoverHeader from '../components/DiscoverHeader';
@@ -21,7 +22,7 @@ const HIDE_POI_STYLE = [
 export default function DiscoverScreen({ navigation }) {
   const [searchText, setSearchText] = useState('');
   
-  const { visits } = useContext(VisitsContext);
+  const { visits, favorites } = useContext(VisitsContext);
   const visitedRestaurantIds = visits.map(v => v.restaurantId).filter(id => id !== null);
 
   const [selectedCategories, setSelectedCategories] = useState([]); 
@@ -48,15 +49,26 @@ export default function DiscoverScreen({ navigation }) {
     return beerItem ? beerItem.price : 999;
   };
 
+  const handleRandomize = () => {
+    const unvisited = restaurants.filter(r => !visitedRestaurantIds.includes(r.id));
+    const pool = unvisited.length > 0 ? unvisited : restaurants;
+    const randomIndex = Math.floor(Math.random() * pool.length);
+    const randomPlace = pool[randomIndex];
+
+    setSelectedRestaurant(randomPlace);
+    mapRef.current?.animateToRegion({
+      latitude: randomPlace.coordinates.latitude,
+      longitude: randomPlace.coordinates.longitude,
+      latitudeDelta: 0.005, longitudeDelta: 0.005,
+    }, 1000);
+  };
+
   const displayedRestaurants = restaurants.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchText.toLowerCase());
     const matchesCategory = selectedCategories.length === 0 || selectedCategories.some(cat => item.cuisine.includes(cat));
-    
     const currentBeerPrice = getBeerPrice(item);
     const matchesBeer = !isCheapBeer || currentBeerPrice <= 10;
-    
     const matchesLunch = !hasLunch || item.hasLunch;
-    
     return matchesSearch && matchesCategory && matchesBeer && matchesLunch;
   });
 
@@ -72,18 +84,15 @@ export default function DiscoverScreen({ navigation }) {
   const handleRegionChangeComplete = (region) => {
     const latDiff = Math.abs(region.latitude - CENTER_LAT);
     const lngDiff = Math.abs(region.longitude - CENTER_LNG);
-
     if (latDiff > MAX_DELTA * 1.5 || lngDiff > MAX_DELTA * 1.5) {
       mapRef.current?.animateToRegion({
-        latitude: CENTER_LAT,
-        longitude: CENTER_LNG,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
+        latitude: CENTER_LAT, longitude: CENTER_LNG,
+        latitudeDelta: 0.02, longitudeDelta: 0.02,
       }, 500); 
     }
   };
 
-  const markersKey = `${isCheapBeer}-${hasLunch}-${selectedCategories.join(',')}-${searchText}`;
+  const markersKey = `${isCheapBeer}-${hasLunch}-${selectedCategories.join(',')}-${searchText}-${favorites.length}`; 
 
   return (
     <View style={styles.container}>
@@ -93,9 +102,7 @@ export default function DiscoverScreen({ navigation }) {
         provider={PROVIDER_GOOGLE}
         customMapStyle={HIDE_POI_STYLE} 
         showsPointsOfInterest={false}
-        
         onRegionChangeComplete={handleRegionChangeComplete} 
-        
         onPress={() => { setSelectedRestaurant(null); Keyboard.dismiss(); }} 
         initialRegion={{
           latitude: CENTER_LAT, longitude: CENTER_LNG,
@@ -106,8 +113,15 @@ export default function DiscoverScreen({ navigation }) {
         {displayedRestaurants.map((marker) => {
           
           const isVisited = visitedRestaurantIds.includes(marker.id);
+          const isFavorite = favorites.includes(marker.id);
+
+          let pinColor = "#FF5722"; 
           
-          const pinColor = isVisited ? "#4CAF50" : "#FF5722";
+          if (isVisited) {
+            pinColor = "#4CAF50"; 
+          } else if (isFavorite) {
+            pinColor = "#2196F3"; 
+          }
 
           return (
             <Marker
@@ -126,6 +140,10 @@ export default function DiscoverScreen({ navigation }) {
         onOpenFilters={() => setModalVisible(true)}
         activeFiltersCount={activeFiltersCount}
       />
+
+      <TouchableOpacity style={styles.diceButton} onPress={handleRandomize}>
+        <Ionicons name="dice-outline" size={32} color="white" />
+      </TouchableOpacity>
 
       <FilterModal 
         visible={modalVisible}
@@ -154,4 +172,22 @@ export default function DiscoverScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   map: { width: '100%', height: '100%' },
+  
+  diceButton: {
+    position: 'absolute',
+    top: 170, 
+    right: 20,
+    backgroundColor: '#FF4500', 
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    zIndex: 10,
+  }
 });

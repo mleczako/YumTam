@@ -1,8 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useContext } from 'react';
 import { Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { VisitsContext } from '../context/VisitsContext';
 
 export default function RestaurantDetailsScreen({ route, navigation }) {
   const { restaurant } = route.params;
+  
+  const { favorites, toggleFavorite } = useContext(VisitsContext);
+  
+  const isFavorite = favorites.includes(restaurant.id);
 
   const handleAddVisit = () => {
     navigation.navigate('AddVisit', { restaurant: restaurant });
@@ -29,7 +35,19 @@ export default function RestaurantDetailsScreen({ route, navigation }) {
         
         <View style={styles.content}>
           <View style={styles.headerRow}>
-            <Text style={styles.title}>{restaurant.name}</Text>
+            <View style={{flex: 1, flexDirection: 'row', alignItems: 'center'}}>
+              <Text style={styles.title}>{restaurant.name}</Text>
+              
+              <TouchableOpacity onPress={() => toggleFavorite(restaurant.id)}>
+                <Ionicons 
+                  name={isFavorite ? "heart" : "heart-outline"} 
+                  size={28} 
+                  color={isFavorite ? "#E91E63" : "#333"} 
+                  style={{marginLeft: 10}}
+                />
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.ratingBadge}>
               <Text style={styles.ratingText}>★ {restaurant.rating}</Text>
             </View>
@@ -40,7 +58,6 @@ export default function RestaurantDetailsScreen({ route, navigation }) {
 
           <View style={styles.separator} />
 
-          {/* MENU */}
           <Text style={styles.sectionTitle}>Menu</Text>
           {restaurant.menu ? (
             restaurant.menu.map((item, index) => (
@@ -55,7 +72,6 @@ export default function RestaurantDetailsScreen({ route, navigation }) {
 
           <View style={styles.separator} />
 
-          {/* OPINIE I SOCIAL MEDIA */}
           <Text style={styles.sectionTitle}>Opinie i Sociale</Text>
           
           <View style={styles.socialContainer}>
@@ -63,7 +79,6 @@ export default function RestaurantDetailsScreen({ route, navigation }) {
               Zobacz więcej zdjęć i opinii ({restaurant.reviewsCount}+):
             </Text>
 
-            {/* Przycisk Google Maps */}
             <TouchableOpacity style={styles.socialButton} onPress={openGoogleMaps}>
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
                 <Ionicons name="logo-google" size={20} color="#4285F4" style={{ marginRight: 10 }} />
@@ -72,7 +87,6 @@ export default function RestaurantDetailsScreen({ route, navigation }) {
               <Ionicons name="arrow-forward" size={16} color="#aaa" />
             </TouchableOpacity>
 
-            {/* NOWY: Przycisk Instagram */}
             <TouchableOpacity style={[styles.socialButton, { marginTop: 10 }]} onPress={openInstagram}>
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
                 <Ionicons name="logo-instagram" size={20} color="#C13584" style={{ marginRight: 10 }} />
@@ -101,9 +115,9 @@ const styles = StyleSheet.create({
   headerImage: { width: '100%', height: 250 },
   content: { padding: 20, borderTopLeftRadius: 25, borderTopRightRadius: 25, marginTop: -20, backgroundColor: '#fff' },
   
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 26, fontWeight: 'bold', flex: 1, marginRight: 10 },
-  ratingBadge: { backgroundColor: '#FF4500', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
+  title: { fontSize: 24, fontWeight: 'bold', flexShrink: 1 }, 
+  ratingBadge: { backgroundColor: '#FF4500', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, marginLeft: 10 },
   ratingText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   
   cuisine: { color: 'gray', fontSize: 14, marginTop: 5, marginBottom: 10 },
@@ -116,25 +130,14 @@ const styles = StyleSheet.create({
   menuName: { fontSize: 16, fontWeight: '500' },
   menuPrice: { fontSize: 16, fontWeight: 'bold', color: '#FF4500' },
   
-  // STYLE DLA SOCIAL MEDIA
   socialContainer: { backgroundColor: '#f9f9f9', padding: 15, borderRadius: 12 },
   reviewLabel: { color: '#555', marginBottom: 15 },
   
   socialButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between',
-    backgroundColor: 'white', 
-    padding: 12, 
-    borderRadius: 8, 
-    borderWidth: 1, 
-    borderColor: '#eee',
-    // Cień
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: 'white', padding: 12, borderRadius: 8, 
+    borderWidth: 1, borderColor: '#eee',
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
   },
   socialButtonText: { fontWeight: '600', color: '#333' },
 

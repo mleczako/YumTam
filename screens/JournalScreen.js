@@ -1,12 +1,42 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useContext } from 'react';
-import { Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useContext, useMemo, useState } from 'react';
+import { Alert, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { VisitsContext } from '../context/VisitsContext';
+import { restaurants } from '../data/restaurants'; // Potrzebne do obliczenia % postępu
 
 export default function JournalScreen({ navigation }) {
   const { visits, deleteVisit } = useContext(VisitsContext);
+  
+  // Stan sortowania: 'newest', 'oldest', 'rating', 'name'
+  const [sortBy, setSortBy] = useState('newest');
 
-  const reversedVisits = visits ? visits.slice().reverse() : [];
+  // --- OBLICZANIE POSTĘPU ---
+  const totalRestaurants = restaurants.length;
+  // Używamy Set, żeby policzyć unikalne restauracje (jeśli byłeś 2 razy w jednej, liczy się jako 1)
+  const visitedUniqueCount = new Set(visits.map(v => v.restaurantId)).size;
+  const progressPercent = Math.round((visitedUniqueCount / totalRestaurants) * 100);
+
+  // --- LOGIKA SORTOWANIA ---
+  // Używamy useMemo, żeby nie sortować przy każdym kliknięciu w inne elementy, tylko gdy zmienią się wizyty lub typ sortowania
+  const sortedVisits = useMemo(() => {
+    if (!visits) return [];
+    
+    // Tworzymy kopię tablicy, żeby nie psuć oryginału
+    const data = [...visits];
+
+    switch (sortBy) {
+      case 'newest':
+        return data.reverse(); // Domyślnie są dodawane chronologicznie, więc odwracamy
+      case 'oldest':
+        return data; // Oryginalna kolejność (od najstarszych)
+      case 'rating':
+        return data.sort((a, b) => (b.rating || 0) - (a.rating || 0)); // Od najwyższej oceny
+      case 'name':
+        return data.sort((a, b) => a.restaurantName.localeCompare(b.restaurantName)); // Alfabetycznie
+      default:
+        return data.reverse();
+    }
+  }, [visits, sortBy]);
 
   const handleDelete = (id) => {
     Alert.alert(
@@ -37,6 +67,7 @@ export default function JournalScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
+        {/* GWIAZDKI */}
         {item.rating > 0 && (
            <View style={styles.ratingRow}>
              {[...Array(5)].map((_, i) => (
@@ -64,11 +95,44 @@ export default function JournalScreen({ navigation }) {
     </View>
   );
 
+  // Komponent przycisku sortowania
+  const SortButton = ({ title, value }) => (
+    <TouchableOpacity 
+      style={[styles.sortButton, sortBy === value && styles.sortButtonActive]} 
+      onPress={() => setSortBy(value)}
+    >
+      <Text style={[styles.sortButtonText, sortBy === value && styles.sortButtonTextActive]}>
+        {title}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
       <Text style={styles.headerTitle}>Twój Dziennik</Text>
 
-      {reversedVisits.length === 0 ? (
+      {/* --- PASEK POSTĘPU --- */}
+      <View style={styles.progressContainer}>
+        <View style={styles.progressHeader}>
+          <Text style={styles.progressText}>Odkryte miejsca</Text>
+          <Text style={styles.progressPercent}>{visitedUniqueCount} / {totalRestaurants} ({progressPercent}%)</Text>
+        </View>
+        <View style={styles.progressBarBackground}>
+          <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+        </View>
+      </View>
+
+      {/* --- SORTOWANIE --- */}
+      <View style={styles.sortContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <SortButton title="Najnowsze" value="newest" />
+          <SortButton title="Najstarsze" value="oldest" />
+          <SortButton title="Najlepsze" value="rating" />
+          <SortButton title="A-Z" value="name" />
+        </ScrollView>
+      </View>
+
+      {sortedVisits.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="book-outline" size={64} color="#ccc" />
           <Text style={styles.emptyText}>Twój dziennik jest pusty.</Text>
@@ -76,13 +140,14 @@ export default function JournalScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={reversedVisits}
+          data={sortedVisits}
           keyExtractor={(item) => item.id}
           renderItem={renderVisitItem}
-          contentContainerStyle={{ paddingBottom: 100 }} 
+          contentContainerStyle={{ paddingBottom: 100 }}
         />
       )}
 
+      {/* FAB */}
       <TouchableOpacity 
         style={styles.fab} 
         onPress={() => navigation.navigate('AddVisit')}
@@ -103,9 +168,60 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 15,
     color: '#333',
   },
+  
+  // STYLE POSTĘPU
+  progressContainer: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  progressHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8,
+  },
+  progressText: { fontWeight: '600', color: '#555' },
+  progressPercent: { fontWeight: 'bold', color: '#FF4500' },
+  progressBarBackground: {
+    height: 8, backgroundColor: '#eee', borderRadius: 4, overflow: 'hidden'
+  },
+  progressBarFill: {
+    height: '100%', backgroundColor: '#FF4500', borderRadius: 4
+  },
+
+  // STYLE SORTOWANIA
+  sortContainer: {
+    marginBottom: 15,
+    height: 40,
+  },
+  sortButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 20,
+    marginRight: 10,
+    justifyContent: 'center',
+  },
+  sortButtonActive: {
+    backgroundColor: '#333', // Aktywny przycisk ciemny
+  },
+  sortButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#555',
+  },
+  sortButtonTextActive: {
+    color: 'white',
+  },
+
+  // KARTA WIZYTY
   card: {
     backgroundColor: 'white',
     borderRadius: 16,
@@ -181,7 +297,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 90, 
+    bottom: 90,
     backgroundColor: '#FF4500',
     width: 60,
     height: 60,

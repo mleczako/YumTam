@@ -5,44 +5,50 @@ export const VisitsContext = createContext();
 
 export const VisitsProvider = ({ children }) => {
   const [visits, setVisits] = useState([]);
+  const [favorites, setFavorites] = useState([]); 
 
   useEffect(() => {
-    loadVisits();
+    loadData();
   }, []);
 
-  const loadVisits = async () => {
+  const loadData = async () => {
     try {
       const storedVisits = await AsyncStorage.getItem('visits');
-      if (storedVisits) {
-        setVisits(JSON.parse(storedVisits));
-      }
+      if (storedVisits) setVisits(JSON.parse(storedVisits));
+
+      const storedFavs = await AsyncStorage.getItem('favorites');
+      if (storedFavs) setFavorites(JSON.parse(storedFavs));
+      
     } catch (error) {
-      console.error("Błąd ładowania wizyt:", error);
+      console.error("Błąd ładowania danych:", error);
     }
   };
 
   const addVisit = async (visit) => {
     const newVisits = [...visits, visit];
     setVisits(newVisits); 
-    try {
-      await AsyncStorage.setItem('visits', JSON.stringify(newVisits)); 
-    } catch (error) {
-      console.error("Błąd zapisywania wizyty:", error);
-    }
+    await AsyncStorage.setItem('visits', JSON.stringify(newVisits)); 
   };
 
   const deleteVisit = async (id) => {
     const newVisits = visits.filter((item) => item.id !== id);
     setVisits(newVisits);
-    try {
-      await AsyncStorage.setItem('visits', JSON.stringify(newVisits));
-    } catch (error) {
-      console.error("Błąd usuwania wizyty:", error);
+    await AsyncStorage.setItem('visits', JSON.stringify(newVisits));
+  };
+
+  const toggleFavorite = async (restaurantId) => {
+    let newFavs;
+    if (favorites.includes(restaurantId)) {
+      newFavs = favorites.filter(id => id !== restaurantId);
+    } else {
+      newFavs = [...favorites, restaurantId];
     }
+    setFavorites(newFavs);
+    await AsyncStorage.setItem('favorites', JSON.stringify(newFavs));
   };
 
   return (
-    <VisitsContext.Provider value={{ visits, addVisit, deleteVisit }}>
+    <VisitsContext.Provider value={{ visits, favorites, addVisit, deleteVisit, toggleFavorite }}>
       {children}
     </VisitsContext.Provider>
   );
